@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ settings.page_title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: {{ settings.primary_color }};
+            --success-color: {{ settings.success_color }};
+            --warning-color: {{ settings.warning_color }};
+            --danger-color: {{ settings.danger_color }};
+        }
+        
+        .status-operational { color: var(--success-color); }
+        .status-degraded { color: var(--warning-color); }
+        .status-partial_outage { color: #f97316; }
+        .status-major_outage { color: var(--danger-color); }
+        .status-maintenance { color: #6b7280; }
+        
+        .bg-operational { background-color: var(--success-color); }
+        .bg-degraded { background-color: var(--warning-color); }
+        .bg-partial_outage { background-color: #f97316; }
+        .bg-major_outage { background-color: var(--danger-color); }
+        .bg-maintenance { background-color: #6b7280; }
+        
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    {% if settings.logo_url %}
+                        <img src="{{ settings.logo_url }}" alt="{{ settings.company_name }}" class="h-8 mr-3">
+                    {% endif %}
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">{{ settings.page_title }}</h1>
+                        <p class="text-gray-600">{{ settings.page_description }}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-gray-500">Last Updated</div>
+                    <div class="text-gray-900 font-medium" id="last-updated">{{ last_updated|date:"M d, Y H:i:s" }} UTC</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Overall Status -->
+    <section class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex items-center justify-center mb-4">
+                <div class="text-center">
+                    <div class="flex items-center justify-center mb-2">
+                        <span class="status-indicator bg-{{ status_summary.overall_status }} pulse-dot"></span>
+                        <span class="text-2xl font-bold status-{{ status_summary.overall_status }}">
+                            {% if status_summary.overall_status == 'operational' %}
+                                All Systems Operational
+                            {% elif status_summary.overall_status == 'degraded' %}
+                                Degraded Performance
+                            {% elif status_summary.overall_status == 'partial_outage' %}
+                                Partial System Outage
+                            {% elif status_summary.overall_status == 'major_outage' %}
+                                Major System Outage
+                            {% elif status_summary.overall_status == 'maintenance' %}
+                                Under Maintenance
+                            {% endif %}
+                        </span>
+                    </div>
+                    <p class="text-gray-600">
+                        {{ status_summary.operational_endpoints }}/{{ status_summary.total_endpoints }} services operational
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Status -->
+    <section class="container mx-auto px-4 mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Service Status</h2>
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
+                {% for item in endpoint_data %}
+                    <div class="border-b border-r border-gray-200 p-6 last:border-b-0">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center">
+                                <span class="status-indicator bg-{{ item.endpoint.current_status }}"></span>
+                                <h3 class="font-semibold text-gray-900">{{ item.endpoint.name }}</h3>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-medium status-{{ item.endpoint.current_status }}">
+                                    {% if item.endpoint.current_status == 'operational' %}Operational
+                                    {% elif item.endpoint.current_status == 'degraded' %}Degraded
+                                    {% elif item.endpoint.current_status == 'partial_outage' %}Partial Outage
+                                    {% elif item.endpoint.current_status == 'major_outage' %}Major Outage
+                                    {% elif item.endpoint.current_status == 'maintenance' %}Maintenance
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="text-gray-600 text-sm mb-3">{{ item.endpoint.description }}</p>
+                        
+                        {% if settings.show_uptime_percentage or settings.show_response_times %}
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                {% if settings.show_uptime_percentage %}
+                                    <div>
+                                        <div class="text-gray-500">24h Uptime</div>
+                                        <div class="font-semibold 
+                                            {% if item.metrics.uptime_percentage >= 99.9 %}text-green-600
+                                            {% elif item.metrics.uptime_percentage >= 99.0 %}text-yellow-600
+                                            {% else %}text-red-600{% endif %}">
+                                            {{ item.metrics.uptime_percentage }}%
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% if settings.show_response_times %}
+                                    <div>
+                                        <div class="text-gray-500">Avg Response</div>
+                                        <div class="font-semibold 
+                                            {% if item.metrics.avg_response_time <= 0.5 %}text-green-600
+                                            {% elif item.metrics.avg_response_time <= 2.0 %}text-yellow-600
+                                            {% else %}text-red-600{% endif %}">
+                                            {{ item.metrics.avg_response_time|floatformat:2 }}s
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        
+                        {% if item.endpoint.last_check %}
+                            <div class="mt-3 text-xs text-gray-500">
+                                Last checked: {{ item.endpoint.last_check|timesince }} ago
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- System Metrics -->
+    {% if status_summary.system_metrics %}
+    <section class="container mx-auto px-4 mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">System Performance (Last 24h)</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-gray-500 text-sm">CPU Usage</div>
+                        <div class="text-2xl font-bold text-gray-900">{{ status_summary.system_metrics.avg_cpu_usage|floatformat:1 }}%</div>
+                    </div>
+                    <div class="text-blue-500">
+                        <i class="fas fa-microchip text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-gray-500 text-sm">Memory Usage</div>
+                        <div class="text-2xl font-bold text-gray-900">{{ status_summary.system_metrics.avg_memory_usage|floatformat:1 }}%</div>
+                    </div>
+                    <div class="text-green-500">
+                        <i class="fas fa-memory text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-gray-500 text-sm">Avg Response Time</div>
+                        <div class="text-2xl font-bold text-gray-900">{{ status_summary.system_metrics.avg_response_time|floatformat:2 }}s</div>
+                    </div>
+                    <div class="text-yellow-500">
+                        <i class="fas fa-clock text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-gray-500 text-sm">Error Rate</div>
+                        <div class="text-2xl font-bold text-gray-900">{{ status_summary.system_metrics.error_rate|floatformat:2 }}%</div>
+                    </div>
+                    <div class="text-red-500">
+                        <i class="fas fa-exclamation-triangle text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Recent Incidents -->
+    {% if settings.show_incident_history and recent_incidents %}
+    <section class="container mx-auto px-4 mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Recent Incidents</h2>
+        <div class="bg-white rounded-lg shadow-md">
+            {% for incident in recent_incidents %}
+                <div class="border-b border-gray-200 p-6 last:border-b-0">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mr-3
+                                    {% if incident.severity == 'low' %}bg-green-100 text-green-800
+                                    {% elif incident.severity == 'medium' %}bg-yellow-100 text-yellow-800
+                                    {% elif incident.severity == 'high' %}bg-orange-100 text-orange-800
+                                    {% elif incident.severity == 'critical' %}bg-red-100 text-red-800
+                                    {% endif %}">
+                                    {{ incident.get_severity_display }}
+                                </span>
+                                <h3 class="font-semibold text-gray-900">{{ incident.title }}</h3>
+                            </div>
+                            <p class="text-gray-600 mb-3">{{ incident.description }}</p>
+                            <div class="text-sm text-gray-500">
+                                <span class="mr-4">
+                                    <i class="fas fa-calendar mr-1"></i>
+                                    {{ incident.created_at|date:"M d, Y H:i" }}
+                                </span>
+                                {% if incident.duration %}
+                                    <span class="mr-4">
+                                        <i class="fas fa-clock mr-1"></i>
+                                        Duration: {{ incident.duration }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="ml-4 flex-shrink-0">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                {% if incident.status == 'resolved' %}bg-green-100 text-green-800
+                                {% elif incident.status == 'investigating' %}bg-yellow-100 text-yellow-800
+                                {% elif incident.status == 'monitoring' %}bg-blue-100 text-blue-800
+                                {% else %}bg-gray-100 text-gray-800
+                                {% endif %}">
+                                {{ incident.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Footer -->
+    <footer class="container mx-auto px-4 py-8 text-center text-gray-600">
+        <div class="mb-4">
+            <p>&copy; {{ last_updated|date:"Y" }} {{ settings.company_name }}. All rights reserved.</p>
+        </div>
+        <div class="text-sm">
+            <span class="mr-4">
+                <i class="fas fa-sync-alt mr-1"></i>
+                Auto-refresh every {{ settings.refresh_interval_seconds }}s
+            </span>
+            <span>
+                <i class="fas fa-shield-alt mr-1"></i>
+                Powered by Driver App Health Monitoring
+            </span>
+        </div>
+    </footer>
+
+    <!-- Configuration data for JavaScript -->
+    <div id="status-page-config" 
+         data-refresh-interval="{{ settings.refresh_interval_seconds|default:60 }}" 
+         style="display: none;"></div>
+
+    <!-- Auto-refresh Script -->
+    <script>
+        // Get configuration from data attributes
+        var config = document.getElementById('status-page-config');
+        var refreshIntervalSeconds = parseInt(config.getAttribute('data-refresh-interval')) || 60;
+        
+        // Auto-refresh the page
+        setInterval(function() {
+            fetch('/health/status-page-api/')
+                .then(function(response) { 
+                    return response.json(); 
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        // Update last updated timestamp
+                        var lastUpdatedElement = document.getElementById('last-updated');
+                        if (lastUpdatedElement) {
+                            lastUpdatedElement.textContent = new Date(data.timestamp).toLocaleString() + ' UTC';
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error fetching status update:', error);
+                });
+        }, refreshIntervalSeconds * 1000);
+
+        // Show loading indicator on refresh
+        document.addEventListener('DOMContentLoaded', function() {
+            var countdown = refreshIntervalSeconds;
+            
+            setInterval(function() {
+                countdown--;
+                if (countdown <= 0) {
+                    countdown = refreshIntervalSeconds;
+                    // Optional: Show refresh indicator
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status Page Error</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex items-center justify-center">
+        <div class="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+            <div class="text-center">
+                <div class="text-red-500 mb-4">
+                    <i class="fas fa-exclamation-triangle text-6xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900 mb-4">Status Page Error</h1>
+                <p class="text-gray-600 mb-6">
+                    We're having trouble loading the status page. Please try refreshing or check back later.
+                </p>
+                
+                {% if error %}
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                        <div class="text-sm text-red-800">
+                            <strong>Error Details:</strong><br>
+                            {{ error }}
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <div class="space-y-3">
+                    <button onclick="location.reload()" 
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg">
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        Refresh Page
+                    </button>
+                    
+                    <a href="/" 
+                       class="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg inline-block text-center">
+                        <i class="fas fa-home mr-2"></i>
+                        Go to Homepage
+                    </a>
+                </div>
+                
+                <div class="mt-8 text-sm text-gray-500">
+                    <p>If this problem persists, please contact our support team.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
