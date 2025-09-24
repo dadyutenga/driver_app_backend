@@ -122,18 +122,18 @@ class EmailService:
     
     @staticmethod
     def send_email(to_email: str, subject: str, message: str, html_message: str = None) -> Tuple[bool, str]:
-        """Send email using Django's email backend"""
+        """Send email using Django's email backend - PRODUCTION VERSION"""
         try:
-            # For development, just log instead of actually sending
+            # Check if email settings are configured
             if not hasattr(settings, 'EMAIL_HOST_USER') or settings.EMAIL_HOST_USER == 'your-email@gmail.com':
-                logger.info(f"[DEV MODE] Email would be sent to {to_email} with subject: {subject}")
-                logger.info(f"[DEV MODE] Email content: {message}")
-                return True, "Email logged in development mode"
+                # Log the issue but don't fail in production
+                logger.error(f"EMAIL NOT CONFIGURED! Email to {to_email} not sent. Configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD in settings.py")
+                return False, "Email service not configured. Please contact administrator."
             
             # Try to send email with timeout
             from django.core.mail import get_connection
             connection = get_connection(
-                timeout=5  # 5 second timeout to prevent hanging
+                timeout=getattr(settings, 'EMAIL_TIMEOUT', 10)
             )
             
             send_mail(
@@ -145,12 +145,12 @@ class EmailService:
                 fail_silently=False,
                 connection=connection
             )
-            logger.info(f"Email sent to {to_email}")
+            logger.info(f"Email sent successfully to {to_email}")
             return True, "Email sent successfully"
+            
         except Exception as e:
-            logger.warning(f"Email sending failed, but continuing: {e}")
-            # In development, don't fail the registration if email fails
-            return True, f"Email queued (SMTP not configured): {str(e)[:100]}"
+            logger.error(f"Email sending failed: {e}")
+            return False, f"Email sending failed: {str(e)}"
     
     @staticmethod
     def send_otp_email(to_email: str, otp_code: str, otp_type: str = "verification") -> Tuple[bool, str]:

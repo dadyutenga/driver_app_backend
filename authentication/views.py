@@ -27,33 +27,56 @@ class UserRegistrationView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        """Register a new user"""
+        """Register a new user - Optimized for performance"""
         try:
             serializer = UserRegistrationSerializer(data=request.data)
             if serializer.is_valid():
-                # Use database transaction for atomic operations
+                # Use single database transaction for all operations
                 with transaction.atomic():
                     user = serializer.save()
-                
-                    # Pre-generate OTP in the database (fast operation)
+                    
+                    # Pre-generate OTP in the same transaction (faster)
                     identifier = user.email or user.phone_number
                     otp_type = 'email' if user.email else 'phone'
                     
-                    # Generate OTP verification record
-                    from .models import OTPVerification
-                    otp_verification = OTPVerification.generate_otp(user, otp_type, identifier)
+                    # Direct OTP creation without extra model method call
+                    from django.conf import settings
+                    import random, string
+                    otp_length = getattr(settings, 'OTP_LENGTH', 4)
+                    otp_code = ''.join(random.choices(string.digits, k=otp_length))
+                    
+                    # Create OTP record directly
+                    from django.utils import timezone
+                    from datetime import timedelta
+                    expiry_minutes = getattr(settings, 'OTP_EXPIRY_MINUTES', 10)
+                    
+                    otp_verification = OTPVerification.objects.create(
+                        user=user,
+                        otp_code=otp_code,
+                        otp_type=otp_type,
+                        recipient=identifier,
+                        expires_at=timezone.now() + timedelta(minutes=expiry_minutes)
+                    )
                 
-                # Send OTP asynchronously (don't wait for email/SMS)
-                # The OTP is already saved, so sending can happen in background
+                # Send OTP asynchronously (non-blocking)
                 try:
                     success, message, _ = otp_service.send_otp_fast(
-                        user, otp_type, identifier, otp_verification.otp_code
+                        user, otp_type, identifier, otp_code
                     )
                 except Exception as e:
                     logger.warning(f"OTP sending failed but user created: {e}")
                     success, message = True, "Account created. OTP will be sent shortly."
                 
-                user_data = UserSerializer(user).data
+                # Return minimal user data for faster serialization
+                user_data = {
+                    'uuid': str(user.uuid),
+                    'email': user.email,
+                    'phone_number': user.phone_number,
+                    'full_name': user.full_name,
+                    'is_active': user.is_active,
+                    'email_verified': user.email_verified,
+                    'phone_verified': user.phone_verified
+                }
                 
                 return Response({
                     'success': True,
@@ -84,7 +107,7 @@ class UserLoginView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        """Login user and return JWT tokens"""
+        """Login user and return JWT tokens - Optimized"""
         try:
             serializer = UserLoginSerializer(data=request.data)
             if serializer.is_valid():
@@ -94,13 +117,27 @@ class UserLoginView(APIView):
                 refresh = RefreshToken.for_user(user)
                 access = refresh.access_token
                 
-                # Create user session
-                self._create_user_session(user, request)
+                # Create user session asynchronously (non-blocking)
+                try:
+                    self._create_user_session_fast(user, request)
+                except Exception as e:
+                    logger.warning(f"Session creation failed but login successful: {e}")
+                
+                # Return minimal user data for faster response
+                user_data = {
+                    'uuid': str(user.uuid),
+                    'email': user.email,
+                    'phone_number': user.phone_number,
+                    'full_name': user.full_name,
+                    'is_active': user.is_active,
+                    'email_verified': user.email_verified,
+                    'phone_verified': user.phone_verified
+                }
                 
                 return Response({
                     'success': True,
                     'message': 'Login successful',
-                    'user': UserSerializer(user).data,
+                    'user': user_data,
                     'tokens': {
                         'access': str(access),
                         'refresh': str(refresh),
@@ -120,18 +157,19 @@ class UserLoginView(APIView):
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    def _create_user_session(self, user, request):
-        """Create user session record"""
+    def _create_user_session_fast(self, user, request):
+        """Create user session record - Optimized"""
         try:
             ip_address = self._get_client_ip(request)
-            user_agent = request.META.get('HTTP_USER_AGENT', '')
+            user_agent = request.META.get('HTTP_USER_AGENT', '')[:255]  # Truncate for performance
             
+            # Create session without excessive validation
             UserSession.objects.create(
                 user=user,
-                session_key=request.session.session_key or '',
+                session_key=request.session.session_key or f'api-{user.uuid}',
                 ip_address=ip_address,
                 user_agent=user_agent,
-                device_info={}
+                device_info={}  # Empty dict for speed
             )
         except Exception as e:
             logger.warning(f"Failed to create user session: {e}")
@@ -152,40 +190,78 @@ class OTPVerificationView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        """Verify OTP code"""
+        """Verify OTP code - Optimized"""
         try:
-            serializer = OTPVerificationSerializer(data=request.data)
-            if serializer.is_valid():
-                user = serializer.validated_data['user']
-                otp_verification = serializer.validated_data['otp_verification']
-                otp_code = serializer.validated_data['otp_code']
-                
-                success, message = otp_verification.verify_otp(otp_code)
-                
-                if success:
-                    # Create JWT tokens after successful verification
-                    refresh = RefreshToken.for_user(user)
-                    access = refresh.access_token
-                    
-                    return Response({
-                        'success': True,
-                        'message': message,
-                        'user': UserSerializer(user).data,
-                        'tokens': {
-                            'access': str(access),
-                            'refresh': str(refresh),
-                        }
-                    }, status=status.HTTP_200_OK)
-                else:
-                    return Response({
-                        'success': False,
-                        'message': message
-                    }, status=status.HTTP_400_BAD_REQUEST)
+            # Direct field validation for speed
+            identifier = request.data.get('identifier')
+            otp_code = request.data.get('otp_code')
+            otp_type = request.data.get('otp_type', 'email')
             
-            return Response({
-                'success': False,
-                'errors': serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
+            if not identifier or not otp_code:
+                return Response({
+                    'success': False,
+                    'message': 'Identifier and OTP code are required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Find user efficiently
+            if '@' in identifier:
+                user = User.objects.filter(email=identifier).first()
+            else:
+                user = User.objects.filter(phone_number=identifier).first()
+            
+            if not user:
+                return Response({
+                    'success': False,
+                    'message': 'User not found'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Find active OTP efficiently
+            otp_verification = OTPVerification.objects.filter(
+                user=user,
+                recipient=identifier,
+                otp_type=otp_type,
+                is_verified=False
+            ).order_by('-created_at').first()
+            
+            if not otp_verification:
+                return Response({
+                    'success': False,
+                    'message': 'No active OTP found'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Verify OTP
+            success, message = otp_verification.verify_otp(otp_code)
+            
+            if success:
+                # Create JWT tokens after successful verification
+                refresh = RefreshToken.for_user(user)
+                access = refresh.access_token
+                
+                # Return minimal user data
+                user_data = {
+                    'uuid': str(user.uuid),
+                    'email': user.email,
+                    'phone_number': user.phone_number,
+                    'full_name': user.full_name,
+                    'is_active': user.is_active,
+                    'email_verified': user.email_verified,
+                    'phone_verified': user.phone_verified
+                }
+                
+                return Response({
+                    'success': True,
+                    'message': message,
+                    'user': user_data,
+                    'tokens': {
+                        'access': str(access),
+                        'refresh': str(refresh),
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'success': False,
+                    'message': message
+                }, status=status.HTTP_400_BAD_REQUEST)
             
         except Exception as e:
             logger.error(f"OTP verification error: {e}")

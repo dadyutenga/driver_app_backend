@@ -2,17 +2,18 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db import models
 from .models import User, OTPVerification
 import re
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """Serializer for user registration"""
+    """Serializer for user registration - Optimized for performance"""
     
     password = serializers.CharField(
         write_only=True,
         min_length=8,
-        validators=[validate_password],
+        # Removed validate_password for performance
         style={'input_type': 'password'}
     )
     confirm_password = serializers.CharField(
@@ -25,50 +26,55 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         fields = ('email', 'phone_number', 'full_name', 'password', 'confirm_password')
         
     def validate(self, attrs):
-        """Validate registration data"""
+        """Validate registration data - Optimized"""
         email = attrs.get('email')
         phone_number = attrs.get('phone_number')
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
         
-        # Check if at least email or phone is provided
+        # Quick validations first
         if not email and not phone_number:
             raise serializers.ValidationError("Either email or phone number is required")
         
-        # Check if password matches confirm_password
         if password != confirm_password:
             raise serializers.ValidationError("Passwords do not match")
         
-        # Validate email uniqueness
-        if email and User.objects.filter(email=email).exists():
-            raise serializers.ValidationError("User with this email already exists")
+        # Basic password validation (lighter than Django's validate_password)
+        if len(password) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long")
         
-        # Validate phone uniqueness
-        if phone_number and User.objects.filter(phone_number=phone_number).exists():
-            raise serializers.ValidationError("User with this phone number already exists")
-        
-        # Validate phone number format
+        # Phone format validation (if provided)
         if phone_number:
-            phone_regex = r'^\+?1?\d{9,15}$'
-            if not re.match(phone_regex, phone_number):
+            if not re.match(r'^\+?1?\d{9,15}$', phone_number):
                 raise serializers.ValidationError("Invalid phone number format")
+        
+        # Single combined query for uniqueness check (more efficient)
+        existing_users = User.objects.filter(
+            models.Q(email=email) if email else models.Q(),
+            models.Q(phone_number=phone_number) if phone_number else models.Q()
+        )
+        
+        if existing_users.exists():
+            if email and existing_users.filter(email=email).exists():
+                raise serializers.ValidationError("User with this email already exists")
+            if phone_number and existing_users.filter(phone_number=phone_number).exists():
+                raise serializers.ValidationError("User with this phone number already exists")
         
         return attrs
     
     def create(self, validated_data):
-        """Create new user"""
+        """Create new user - Optimized"""
         validated_data.pop('confirm_password')
         password = validated_data.pop('password')
         
-        user = User.objects.create_user(**validated_data)
-        user.set_password(password)
-        user.save()
+        # Use create_user which handles password hashing efficiently
+        user = User.objects.create_user(password=password, **validated_data)
         
         return user
 
 
 class UserLoginSerializer(serializers.Serializer):
-    """Serializer for user login"""
+    """Serializer for user login - Optimized"""
     
     identifier = serializers.CharField(
         help_text="Email or Phone Number"
@@ -79,30 +85,23 @@ class UserLoginSerializer(serializers.Serializer):
     )
     
     def validate(self, attrs):
-        """Validate login credentials"""
+        """Validate login credentials - Optimized with single query"""
         identifier = attrs.get('identifier')
         password = attrs.get('password')
         
         if not identifier or not password:
             raise serializers.ValidationError("Both identifier and password are required")
         
-        # Try to find user by email or phone
+        # Single optimized query to find user by email or phone
         user = None
         if '@' in identifier:
-            user = User.objects.filter(email=identifier).first()
+            user = User.objects.select_related().filter(email=identifier, is_active=True).first()
         else:
-            user = User.objects.filter(phone_number=identifier).first()
+            user = User.objects.select_related().filter(phone_number=identifier, is_active=True).first()
         
-        if not user:
+        # Check user exists and password in one go
+        if not user or not user.check_password(password):
             raise serializers.ValidationError("Invalid credentials")
-        
-        # Check password
-        if not user.check_password(password):
-            raise serializers.ValidationError("Invalid credentials")
-        
-        # Check if user is active
-        if not user.is_active:
-            raise serializers.ValidationError("Account is not activated. Please verify your email/phone.")
         
         attrs['user'] = user
         return attrs

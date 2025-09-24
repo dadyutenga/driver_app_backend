@@ -93,8 +93,18 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        # SQLite performance optimizations
+        'OPTIONS': {
+            'timeout': 20,
+        },
     }
 }
+
+# Database connection optimization
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Performance optimizations
+CONN_MAX_AGE = 60  # Keep database connections alive for 60 seconds
 
 
 # Password validation
@@ -158,20 +168,24 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
-# JWT Configuration
+# JWT Configuration - Optimized
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
+    'UPDATE_LAST_LOGIN': False,  # Disable last login updates for performance
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
+    'USER_ID_FIELD': 'uuid',  # Use UUID instead of ID
+    'USER_ID_CLAIM': 'user_uuid',
+    'JTI_CLAIM': 'jti',
+    # Performance optimizations
+    'TOKEN_OBTAIN_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenObtainPairSerializer',
+    'TOKEN_REFRESH_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenRefreshSerializer',
 }
 
 # CORS Settings
@@ -191,15 +205,17 @@ OAUTH2_PROVIDER = {
     'REFRESH_TOKEN_EXPIRE_SECONDS': 3600 * 24 * 7,
 }
 
-# Email Configuration (Development - Console Backend)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development - prints to console
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # For production
+# Email Configuration (Production Ready)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # PRODUCTION - Actually sends emails
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
-EMAIL_HOST_USER = 'your-email@gmail.com'  # Replace with your Gmail
-EMAIL_HOST_PASSWORD = 'your-app-password'  # Replace with your app password
+EMAIL_HOST_USER = 'your-email@gmail.com'  # REPLACE WITH YOUR ACTUAL GMAIL
+EMAIL_HOST_PASSWORD = 'your-app-password'  # REPLACE WITH YOUR APP PASSWORD
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# Email timeout to prevent hanging in production
+EMAIL_TIMEOUT = 10
 
 # SMS Configuration
 TWILIO_ACCOUNT_SID = 'your-twilio-account-sid'

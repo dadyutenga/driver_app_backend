@@ -83,6 +83,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         db_table = 'authentication_user'
         verbose_name = 'User'
         verbose_name_plural = 'Users'
+        indexes = [
+            models.Index(fields=['email'], name='user_email_idx'),
+            models.Index(fields=['phone_number'], name='user_phone_idx'),
+            models.Index(fields=['uuid'], name='user_uuid_idx'),
+            models.Index(fields=['is_active', 'email'], name='user_active_email_idx'),
+            models.Index(fields=['is_active', 'phone_number'], name='user_active_phone_idx'),
+        ]
         
     def __str__(self):
         return self.email or self.phone_number or f"User {self.uuid}"
@@ -125,6 +132,12 @@ class OTPVerification(models.Model):
     class Meta:
         db_table = 'authentication_otp_verification'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'otp_type', 'is_verified'], name='otp_user_type_verified_idx'),
+            models.Index(fields=['recipient', 'otp_type'], name='otp_recipient_type_idx'),
+            models.Index(fields=['user', 'is_verified', '-created_at'], name='otp_user_latest_idx'),
+            models.Index(fields=['expires_at'], name='otp_expires_idx'),
+        ]
         
     def __str__(self):
         return f"OTP for {self.user} - {self.otp_type}"
