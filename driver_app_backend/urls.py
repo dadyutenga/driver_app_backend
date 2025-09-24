@@ -26,12 +26,9 @@ def api_root(request):
         'endpoints': {
             'auth': '/api/v1/auth/',
             'routing': '/api/v1/routing/',
-            'health': '/health/',
-            'status-page': '/health/status-page/',
             'admin': '/admin/',
             'oauth': '/api/v1/auth/oauth/',
         },
-        'health_check': '/health/',
         'status': 'operational'
     })
 
@@ -46,9 +43,6 @@ urlpatterns = [
     # API v1
     path('api/v1/auth/', include('authentication.urls')),
     path('api/v1/routing/', include('routing.urls')),
-    
-    # Health monitoring and status page
-    path('health/', include('health.urls')),
     
     # OAuth2 (alternative path)
     path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),

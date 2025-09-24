@@ -52,11 +52,9 @@ INSTALLED_APPS = [
     'oauth2_provider',
     'authentication',
     'routing',
-    'health',
 ]
 
 MIDDLEWARE = [
-    'health.middleware.ResponseTimeHeaderMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'oauth2_provider.middleware.OAuth2TokenMiddleware',
@@ -66,8 +64,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'health.middleware.APIRequestTrackingMiddleware',
-    'health.middleware.HealthCheckMiddleware',
 ]
 
 ROOT_URLCONF = 'driver_app_backend.urls'
@@ -228,28 +224,5 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # Celery Beat Schedule for periodic tasks
 CELERY_BEAT_SCHEDULE = {
-    'run-health-checks': {
-        'task': 'health.tasks.run_health_checks_task',
-        'schedule': 30.0,  # Run every 30 seconds
-    },
-    'collect-system-metrics': {
-        'task': 'health.tasks.collect_system_metrics_task',
-        'schedule': 60.0,  # Run every 1 minute
-    },
-    'cleanup-old-health-data': {
-        'task': 'health.tasks.cleanup_old_health_data_task',
-        'schedule': 86400.0,  # Run daily
-    },
-    'check-endpoint-alerting': {
-        'task': 'health.tasks.check_endpoint_alerting_task',
-        'schedule': 120.0,  # Run every 2 minutes
-    },
-    'update-endpoint-uptime': {
-        'task': 'health.tasks.update_endpoint_uptime_task',
-        'schedule': 300.0,  # Run every 5 minutes
-    },
-    'generate-daily-report': {
-        'task': 'health.tasks.generate_daily_report_task',
-        'schedule': crontab(hour=0, minute=30),  # Run daily at 00:30
-    },
+    # Health monitoring tasks have been removed
 }
