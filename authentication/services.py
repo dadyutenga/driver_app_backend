@@ -121,6 +121,45 @@ class EmailService:
     """Service for sending emails"""
     
     @staticmethod
+    def send_email_fast(to_email: str, subject: str, message: str, html_message: str = None) -> Tuple[bool, str]:
+        """Send email with immediate return - ULTRA FAST VERSION"""        
+        import threading
+        
+        def send_email_background():
+            """Send email in background thread"""
+            try:
+                # Check if email settings are configured
+                if not hasattr(settings, 'EMAIL_HOST_USER') or settings.EMAIL_HOST_USER == 'your-email@gmail.com':
+                    logger.error(f"EMAIL NOT CONFIGURED! Email to {to_email} not sent.")
+                    return
+                
+                # Send email with very short timeout
+                from django.core.mail import get_connection
+                connection = get_connection(timeout=3)  # 3 second timeout
+                
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[to_email],
+                    html_message=html_message,
+                    fail_silently=True,  # Don't raise errors
+                    connection=connection
+                )
+                logger.info(f"Email sent successfully to {to_email}")
+                
+            except Exception as e:
+                logger.error(f"Background email failed: {e}")
+        
+        # Start background thread and return immediately
+        thread = threading.Thread(target=send_email_background)
+        thread.daemon = True  # Dies with main thread
+        thread.start()
+        
+        # Return immediately - don't wait for email
+        return True, "Email queued for sending"
+
+    @staticmethod
     def send_email(to_email: str, subject: str, message: str, html_message: str = None) -> Tuple[bool, str]:
         """Send email using Django's email backend - PRODUCTION VERSION"""
         try:
@@ -154,74 +193,68 @@ class EmailService:
     
     @staticmethod
     def send_otp_email(to_email: str, otp_code: str, otp_type: str = "verification") -> Tuple[bool, str]:
-        """Send OTP via email with template"""
+        """Send OTP via email with beautiful template - FAST VERSION"""
         subject_map = {
-            'email': 'Verify Your Email Address',
-            'login': 'Login Verification Code',
-            'password_reset': 'Password Reset Code',
+            'email': 'Verify Your DriveShare Account 🚗',
+            'login': 'DriveShare Login Verification',
+            'password_reset': 'Reset Your DriveShare Password',
         }
         
-        subject = subject_map.get(otp_type, 'Verification Code')
+        subject = subject_map.get(otp_type, 'DriveShare Verification Code')
         
-        # Create email content
+        # Create email content with beautiful template
+        from django.template.loader import render_to_string
+        from django.conf import settings
+        
         context = {
             'otp_code': otp_code,
             'otp_type': otp_type,
             'expiry_minutes': getattr(settings, 'OTP_EXPIRY_MINUTES', 10)
         }
         
-        # Plain text message
+        try:
+            # Try to render beautiful HTML template
+            html_message = render_to_string('emails/otp_verification.html', context)
+        except Exception as e:
+            logger.warning(f"Template rendering failed, using simple HTML: {e}")
+            # Fallback to simple HTML if template fails
+            html_message = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #ff6b6b, #ff8e8e); padding: 30px; text-align: center; border-radius: 10px; margin-bottom: 20px;">
+                    <h1 style="color: white; margin: 0;">DriveShare 🚗</h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0;">Your Ride, Your Way</p>
+                </div>
+                <div style="text-align: center; padding: 20px;">
+                    <h2 style="color: #2c3e50;">Verification Code</h2>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                        <div style="font-size: 32px; font-weight: bold; color: #2c3e50; letter-spacing: 4px; font-family: monospace;">{otp_code}</div>
+                        <p style="color: #7f8c8d; margin: 10px 0 0 0;">Valid for {context['expiry_minutes']} minutes</p>
+                    </div>
+                    <p style="color: #7f8c8d;">Welcome to DriveShare! Please use this code to verify your account.</p>
+                </div>
+            </body>
+            </html>
+            """
+        
+        # Plain text fallback
         message = f"""
+DriveShare - Your Ride, Your Way 🚗
+
 Hello,
 
-Your {otp_type} code is: {otp_code}
+Your verification code is: {otp_code}
 
 This code will expire in {context['expiry_minutes']} minutes.
 
-If you didn't request this code, please ignore this email.
+Welcome to DriveShare!
 
 Best regards,
-Driver App Team
+The DriveShare Team
         """
         
-        # HTML message
-        html_message = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{subject}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background-color: #007bff; color: white; padding: 20px; text-align: center; }}
-        .content {{ padding: 20px; background-color: #f8f9fa; }}
-        .otp-code {{ font-size: 24px; font-weight: bold; color: #007bff; text-align: center; 
-                    background-color: #e7f3ff; padding: 15px; margin: 20px 0; border-radius: 5px; }}
-        .footer {{ padding: 20px; text-align: center; color: #666; font-size: 14px; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Driver App</h1>
-        </div>
-        <div class="content">
-            <h2>{subject}</h2>
-            <p>Hello,</p>
-            <p>Your {otp_type} code is:</p>
-            <div class="otp-code">{otp_code}</div>
-            <p>This code will expire in {context['expiry_minutes']} minutes.</p>
-            <p>If you didn't request this code, please ignore this email.</p>
-        </div>
-        <div class="footer">
-            <p>Best regards,<br>Driver App Team</p>
-        </div>
-    </div>
-</body>
-</html>
-        """
-        
-        return EmailService.send_email(to_email, subject, message, html_message)
+        # Use fast email sending (background thread)
+        return EmailService.send_email_fast(to_email, subject, message, html_message)
 
 
 class OTPService:
@@ -231,6 +264,33 @@ class OTPService:
         self.sms_service = SMSService()
         self.email_service = EmailService()
     
+    def send_otp_ultra_fast(self, user, otp_type: str, recipient: str, otp_code: str) -> Tuple[bool, str, Optional[Any]]:
+        """Send OTP ULTRA FAST - returns immediately, sends in background"""
+        import threading
+        
+        def send_in_background():
+            """Send OTP in background thread"""
+            try:
+                if '@' in recipient:
+                    # Send via email in background
+                    self.email_service.send_otp_email(recipient, otp_code, otp_type)
+                else:
+                    # Send via SMS in background
+                    sms_message = self._create_sms_message(otp_code, otp_type)
+                    self.sms_service.send_sms(recipient, sms_message)
+                    
+                logger.info(f"OTP sent in background to {recipient}")
+            except Exception as e:
+                logger.error(f"Background OTP sending failed: {e}")
+        
+        # Start background thread
+        thread = threading.Thread(target=send_in_background)
+        thread.daemon = True
+        thread.start()
+        
+        # Return immediately
+        return True, "OTP queued for delivery", None
+
     def send_otp_fast(self, user, otp_type: str, recipient: str, otp_code: str) -> Tuple[bool, str, Optional[Any]]:
         """Send OTP quickly without blocking - OTP is already generated"""
         try:

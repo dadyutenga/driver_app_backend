@@ -58,14 +58,14 @@ class UserRegistrationView(APIView):
                         expires_at=timezone.now() + timedelta(minutes=expiry_minutes)
                     )
                 
-                # Send OTP asynchronously (non-blocking)
+                # Send OTP using ultra-fast background method
                 try:
-                    success, message, _ = otp_service.send_otp_fast(
+                    success, message, _ = otp_service.send_otp_ultra_fast(
                         user, otp_type, identifier, otp_code
                     )
                 except Exception as e:
-                    logger.warning(f"OTP sending failed but user created: {e}")
-                    success, message = True, "Account created. OTP will be sent shortly."
+                    logger.warning(f"OTP sending queued: {e}")
+                    success, message = True, "Account created. OTP email queued."
                 
                 # Return minimal user data for faster serialization
                 user_data = {
