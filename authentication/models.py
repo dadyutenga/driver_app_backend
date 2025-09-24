@@ -5,6 +5,7 @@ from django.utils import timezone
 from datetime import timedelta
 import random
 import string
+import uuid
 
 class UserManager(BaseUserManager):
     """Custom user manager for email/phone authentication"""
@@ -46,6 +47,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         message="Phone number must be entered in the format: '+999999999'. Up to 15 digits allowed."
     )
     
+    # UUID field for public API usage
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=False, db_index=True)
+    
     # Basic Information
     email = models.EmailField(unique=True, null=True, blank=True)
     phone_number = models.CharField(
@@ -81,7 +85,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = 'Users'
         
     def __str__(self):
-        return self.email or self.phone_number or f"User {self.id}"
+        return self.email or self.phone_number or f"User {self.uuid}"
     
     def get_full_name(self):
         return self.full_name
@@ -99,6 +103,9 @@ class OTPVerification(models.Model):
         ('password_reset', 'Password Reset'),
         ('login', 'Login Verification'),
     ]
+    
+    # UUID field for public API usage
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=False, db_index=True)
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otp_verifications')
     otp_code = models.CharField(max_length=6)
@@ -190,6 +197,9 @@ class OTPVerification(models.Model):
 
 class UserSession(models.Model):
     """Track user login sessions"""
+    
+    # UUID field for public API usage
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=False, db_index=True)
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
     session_key = models.CharField(max_length=255)

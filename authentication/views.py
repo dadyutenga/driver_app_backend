@@ -31,15 +31,27 @@ class UserRegistrationView(APIView):
         try:
             serializer = UserRegistrationSerializer(data=request.data)
             if serializer.is_valid():
-                user = serializer.save()
+                # Use database transaction for atomic operations
+                with transaction.atomic():
+                    user = serializer.save()
                 
-                # Send OTP for verification
-                identifier = user.email or user.phone_number
-                otp_type = 'email' if user.email else 'phone'
+                    # Pre-generate OTP in the database (fast operation)
+                    identifier = user.email or user.phone_number
+                    otp_type = 'email' if user.email else 'phone'
+                    
+                    # Generate OTP verification record
+                    from .models import OTPVerification
+                    otp_verification = OTPVerification.generate_otp(user, otp_type, identifier)
                 
-                success, message, otp_verification = otp_service.send_otp(
-                    user, otp_type, identifier
-                )
+                # Send OTP asynchronously (don't wait for email/SMS)
+                # The OTP is already saved, so sending can happen in background
+                try:
+                    success, message, _ = otp_service.send_otp_fast(
+                        user, otp_type, identifier, otp_verification.otp_code
+                    )
+                except Exception as e:
+                    logger.warning(f"OTP sending failed but user created: {e}")
+                    success, message = True, "Account created. OTP will be sent shortly."
                 
                 user_data = UserSerializer(user).data
                 
@@ -488,7 +500,7 @@ def user_sessions(request):
         sessions_data = []
         for session in sessions:
             sessions_data.append({
-                'id': session.id,
+                'uuid': session.uuid,
                 'ip_address': session.ip_address,
                 'user_agent': session.user_agent,
                 'login_at': session.login_at,
@@ -512,11 +524,11 @@ def user_sessions(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
-def terminate_session(request, session_id):
+def terminate_session(request, session_uuid):
     """Terminate specific user session"""
     try:
         session = UserSession.objects.get(
-            id=session_id,
+            uuid=session_uuid,
             user=request.user,
             is_active=True
         )

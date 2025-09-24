@@ -191,8 +191,9 @@ OAUTH2_PROVIDER = {
     'REFRESH_TOKEN_EXPIRE_SECONDS': 3600 * 24 * 7,
 }
 
-# Email Configuration (Gmail SMTP)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Email Configuration (Development - Console Backend)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development - prints to console
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # For production
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587

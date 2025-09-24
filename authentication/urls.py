@@ -25,7 +25,7 @@ urlpatterns = [
     
     # Session management
     path('sessions/', views.user_sessions, name='user_sessions'),
-    path('sessions/<int:session_id>/terminate/', views.terminate_session, name='terminate_session'),
+    path('sessions/<uuid:session_uuid>/terminate/', views.terminate_session, name='terminate_session'),
     
     # JWT token endpoints
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
