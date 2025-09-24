@@ -28,10 +28,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-5+w+p3y87+rh&78i80o2#rt8zj8-e)zm4byquu!%k9+-%pvv$m'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-5+w+p3y87+rh&78i80o2#rt8zj8-e)zm4byquu!%k9+-%pvv$m')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = []
 
@@ -205,35 +205,35 @@ OAUTH2_PROVIDER = {
     'REFRESH_TOKEN_EXPIRE_SECONDS': 3600 * 24 * 7,
 }
 
-# Email Configuration (Production Ready)
+# Email Configuration (Production Ready - Using Environment Variables)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # PRODUCTION - Actually sends emails
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
-EMAIL_HOST_USER = 'your-email@gmail.com'  # REPLACE WITH YOUR ACTUAL GMAIL
-EMAIL_HOST_PASSWORD = 'your-app-password'  # REPLACE WITH YOUR APP PASSWORD
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')  # From .env file
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')  # From .env file
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Email timeout to prevent hanging in production
 EMAIL_TIMEOUT = 10
 
-# SMS Configuration
-TWILIO_ACCOUNT_SID = 'your-twilio-account-sid'
-TWILIO_AUTH_TOKEN = 'your-twilio-auth-token'
-TWILIO_PHONE_NUMBER = 'your-twilio-phone-number'
+# SMS Configuration (Using Environment Variables)
+TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='your-twilio-account-sid')
+TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='your-twilio-auth-token')
+TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER', default='your-twilio-phone-number')
 
-AFRICASTALKING_USERNAME = 'your-africastalking-username'
-AFRICASTALKING_API_KEY = 'your-africastalking-api-key'
-AFRICASTALKING_SENDER_ID = 'your-sender-id'
+AFRICASTALKING_USERNAME = config('AFRICASTALKING_USERNAME', default='your-africastalking-username')
+AFRICASTALKING_API_KEY = config('AFRICASTALKING_API_KEY', default='your-africastalking-api-key')
+AFRICASTALKING_SENDER_ID = config('AFRICASTALKING_SENDER_ID', default='your-sender-id')
 
-# OTP Configuration
-OTP_EXPIRY_MINUTES = 10
-OTP_LENGTH = 4
-OTP_MAX_ATTEMPTS = 3
+# OTP Configuration (Using Environment Variables)
+OTP_EXPIRY_MINUTES = config('OTP_EXPIRY_MINUTES', default=10, cast=int)
+OTP_LENGTH = config('OTP_LENGTH', default=4, cast=int)
+OTP_MAX_ATTEMPTS = config('OTP_MAX_ATTEMPTS', default=3, cast=int)
 
-# Celery Configuration (for background tasks)
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+# Celery Configuration (for background tasks - Using Environment Variables)
+CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
