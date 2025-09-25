@@ -27,90 +27,85 @@ class UserRegistrationView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        """Register a new user - Optimized for performance"""
+        """Register a new user (fast path) and issue an OTP challenge (4-char alphanumeric)."""
+        start_time = timezone.now()
         try:
             serializer = UserRegistrationSerializer(data=request.data)
-            if serializer.is_valid():
-                # Use single database transaction ONLY for user creation (FASTEST)
-                with transaction.atomic():
-                    user = serializer.save()
-                    # Activate user immediately - no waiting for OTP
-                    user.is_active = True  # Make user active immediately
-                    user.save()
-                
-                # Generate OTP and send email in background thread (completely non-blocking)
+            if not serializer.is_valid():
+                return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create user in a single transaction; keep user active (2FA via OTP will gate token issuance later).
+            with transaction.atomic():
+                user = serializer.save()
+                if not user.is_active:
+                    user.is_active = True  # Active for login but still requires OTP to verify channel
+                    user.save(update_fields=['is_active'])
+
                 identifier = user.email or user.phone_number
                 otp_type = 'email' if user.email else 'phone'
-                
-                # Start background OTP process immediately after user creation
-                import threading
-                def handle_otp_background():
-                    """Handle OTP creation and sending in background"""
+
+                # Generate 4-character alphanumeric OTP (digits + uppercase letters) for better entropy but short length
+                from django.conf import settings as dj_settings
+                import random, string
+                otp_length = 4  # Requirement: 4 characters (letter or number)
+                alphabet = string.digits + string.ascii_uppercase
+                otp_code = ''.join(random.choices(alphabet, k=otp_length))
+
+                # Create OTP record immediately (no background for DB write)
+                from datetime import timedelta
+                expiry_minutes = getattr(dj_settings, 'OTP_EXPIRY_MINUTES', 10)
+                otp_verification = OTPVerification.objects.create(
+                    user=user,
+                    otp_code=otp_code,
+                    otp_type=otp_type,
+                    recipient=identifier,
+                    expires_at=timezone.now() + timedelta(minutes=expiry_minutes)
+                )
+
+            # Background send with retry (max 3 attempts exponential backoff)
+            import threading, time as _time
+
+            def send_with_retry():
+                attempts = 0
+                base_delay = 1.0  # seconds
+                while attempts < 3:
                     try:
-                        # Generate OTP in background
-                        from django.conf import settings
-                        import random, string
-                        otp_length = getattr(settings, 'OTP_LENGTH', 4)
-                        otp_code = ''.join(random.choices(string.digits, k=otp_length))
-                        
-                        # Create OTP record in background
-                        from django.utils import timezone
-                        from datetime import timedelta
-                        expiry_minutes = getattr(settings, 'OTP_EXPIRY_MINUTES', 10)
-                        
-                        otp_verification = OTPVerification.objects.create(
-                            user=user,
-                            otp_code=otp_code,
-                            otp_type=otp_type,
-                            recipient=identifier,
-                            expires_at=timezone.now() + timedelta(minutes=expiry_minutes)
-                        )
-                        
-                        # Send OTP email in background
-                        otp_service.send_otp_ultra_fast(user, otp_type, identifier, otp_code)
-                        
-                        logger.info(f"Background OTP process completed for {identifier}")
-                        
-                    except Exception as e:
-                        logger.error(f"Background OTP process failed: {e}")
-                
-                # Start background thread immediately and return
-                thread = threading.Thread(target=handle_otp_background)
-                thread.daemon = True
-                thread.start()
-                
-                # Return minimal user data immediately - don't wait for anything
-                user_data = {
-                    'uuid': str(user.uuid),
-                    'email': user.email,
-                    'phone_number': user.phone_number,
-                    'full_name': user.full_name,
-                    'is_active': user.is_active,
-                    'email_verified': False,  # Will be verified when OTP is submitted
-                    'phone_verified': False
-                }
-                
-                return Response({
-                    'success': True,
-                    'message': 'Registration complete! Check your email for verification code.',
-                    'user': user_data,
-                    'otp_sent': True,  # Always true since we queue it
-                    'otp_message': 'Verification email being sent',
-                    'verification_required': True
-                }, status=status.HTTP_201_CREATED)
-            
+                        # Decide channel
+                        if '@' in identifier:
+                            otp_service.email_service.send_otp_email(identifier, otp_code, otp_type)
+                        else:
+                            msg = otp_service._create_sms_message(otp_code, otp_type)
+                            otp_service.sms_service.send_sms(identifier, msg)
+                        logger.info(f"OTP dispatch attempt {attempts+1} succeeded for {identifier}")
+                        return
+                    except Exception as ex:
+                        attempts += 1
+                        logger.warning(f"OTP dispatch attempt {attempts} failed for {identifier}: {ex}")
+                        if attempts < 3:
+                            _time.sleep(base_delay * (2 ** (attempts - 1)))
+                logger.error(f"All OTP dispatch attempts failed for {identifier}")
+
+            threading.Thread(target=send_with_retry, daemon=True).start()
+
+            user_data = {
+                'uuid': str(user.uuid),
+                'email': user.email,
+                'phone_number': user.phone_number,
+                'full_name': user.full_name,
+                'is_active': user.is_active,
+                'email_verified': user.email_verified,
+                'phone_verified': user.phone_verified,
+            }
+
+            elapsed_ms = int((timezone.now() - start_time).total_seconds() * 1000)
             return Response({
-                'success': False,
-                'errors': serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
+                'success': True,
+                'message': 'User registered. Enter the OTP sent to your contact.'
+            }, status=status.HTTP_201_CREATED)
+
         except Exception as e:
             logger.error(f"Registration error: {e}")
-            return Response({
-                'success': False,
-                'message': 'Registration failed',
-                'error': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'success': False, 'message': 'Registration failed', 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserLoginView(APIView):
@@ -119,55 +114,73 @@ class UserLoginView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        """Login user and return JWT tokens - Optimized"""
+        """Login user (password step) then issue OTP challenge; tokens only after OTP verification."""
+        start_time = timezone.now()
         try:
             serializer = UserLoginSerializer(data=request.data)
-            if serializer.is_valid():
-                user = serializer.validated_data['user']
-                
-                # Create JWT tokens
-                refresh = RefreshToken.for_user(user)
-                access = refresh.access_token
-                
-                # Create user session asynchronously (non-blocking)
-                try:
-                    self._create_user_session_fast(user, request)
-                except Exception as e:
-                    logger.warning(f"Session creation failed but login successful: {e}")
-                
-                # Return minimal user data for faster response
-                user_data = {
-                    'uuid': str(user.uuid),
-                    'email': user.email,
-                    'phone_number': user.phone_number,
-                    'full_name': user.full_name,
-                    'is_active': user.is_active,
-                    'email_verified': user.email_verified,
-                    'phone_verified': user.phone_verified
-                }
-                
-                return Response({
-                    'success': True,
-                    'message': 'Login successful',
-                    'user': user_data,
-                    'tokens': {
-                        'access': str(access),
-                        'refresh': str(refresh),
-                    }
-                }, status=status.HTTP_200_OK)
-            
+            if not serializer.is_valid():
+                return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+            user = serializer.validated_data['user']
+
+            # Create (or refresh) a lightweight session record quickly
+            try:
+                self._create_user_session_fast(user, request)
+            except Exception as e:
+                logger.warning(f"Session creation deferred: {e}")
+
+            # Determine OTP channel preference: email first, else phone
+            identifier = user.email or user.phone_number
+            otp_type = 'login'
+
+            # Generate 4-char alphanumeric OTP
+            import random, string
+            alphabet = string.digits + string.ascii_uppercase
+            otp_code = ''.join(random.choices(alphabet, k=4))
+
+            # Create OTP record
+            from datetime import timedelta
+            expiry_minutes = getattr(__import__('django.conf').conf.settings, 'OTP_EXPIRY_MINUTES', 10)
+            otp_verification = OTPVerification.objects.create(
+                user=user,
+                otp_code=otp_code,
+                otp_type=otp_type,
+                recipient=identifier,
+                expires_at=timezone.now() + timedelta(minutes=expiry_minutes)
+            )
+
+            # Background send with retry
+            import threading, time as _time
+            def send_with_retry():
+                attempts = 0
+                base_delay = 1.0
+                while attempts < 3:
+                    try:
+                        if '@' in identifier:
+                            otp_service.email_service.send_otp_email(identifier, otp_code, otp_type)
+                        else:
+                            msg = otp_service._create_sms_message(otp_code, otp_type)
+                            otp_service.sms_service.send_sms(identifier, msg)
+                        logger.info(f"Login OTP dispatch attempt {attempts+1} OK for {identifier}")
+                        return
+                    except Exception as ex:
+                        attempts += 1
+                        logger.warning(f"Login OTP attempt {attempts} failed for {identifier}: {ex}")
+                        if attempts < 3:
+                            _time.sleep(base_delay * (2 ** (attempts - 1)))
+                logger.error(f"All login OTP attempts failed for {identifier}")
+
+            threading.Thread(target=send_with_retry, daemon=True).start()
+
+            elapsed_ms = int((timezone.now() - start_time).total_seconds() * 1000)
             return Response({
-                'success': False,
-                'errors': serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
+                'success': True,
+                'message': 'Password accepted. Enter the OTP sent to your contact.',
+            }, status=status.HTTP_200_OK)
+
         except Exception as e:
             logger.error(f"Login error: {e}")
-            return Response({
-                'success': False,
-                'message': 'Login failed',
-                'error': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'success': False, 'message': 'Login failed', 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _create_user_session_fast(self, user, request):
         """Create user session record - Optimized"""
@@ -202,86 +215,67 @@ class OTPVerificationView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        """Verify OTP code - Optimized"""
+        """Verify OTP, mark verification, and issue tokens (supports email/phone/login/password_reset)."""
+        start_time = timezone.now()
         try:
-            # Direct field validation for speed
             identifier = request.data.get('identifier')
             otp_code = request.data.get('otp_code')
             otp_type = request.data.get('otp_type', 'email')
-            
             if not identifier or not otp_code:
-                return Response({
-                    'success': False,
-                    'message': 'Identifier and OTP code are required'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Find user efficiently
-            if '@' in identifier:
-                user = User.objects.filter(email=identifier).first()
-            else:
-                user = User.objects.filter(phone_number=identifier).first()
-            
+                return Response({'success': False, 'message': 'Identifier and OTP code are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Resolve user
+            user = User.objects.filter(email=identifier).first() if '@' in identifier else User.objects.filter(phone_number=identifier).first()
             if not user:
-                return Response({
-                    'success': False,
-                    'message': 'User not found'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Find active OTP efficiently
-            otp_verification = OTPVerification.objects.filter(
+                return Response({'success': False, 'message': 'User not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get latest active OTP for this type (login may have otp_type='login')
+            otp_qs = OTPVerification.objects.filter(
                 user=user,
                 recipient=identifier,
                 otp_type=otp_type,
                 is_verified=False
-            ).order_by('-created_at').first()
-            
+            ).order_by('-created_at')
+            otp_verification = otp_qs.first()
             if not otp_verification:
-                return Response({
-                    'success': False,
-                    'message': 'No active OTP found'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Verify OTP
+                return Response({'success': False, 'message': 'No active OTP found'}, status=status.HTTP_400_BAD_REQUEST)
+
             success, message = otp_verification.verify_otp(otp_code)
-            
-            if success:
-                # Create JWT tokens after successful verification
-                refresh = RefreshToken.for_user(user)
-                access = refresh.access_token
-                
-                # Return minimal user data
-                user_data = {
-                    'uuid': str(user.uuid),
-                    'email': user.email,
-                    'phone_number': user.phone_number,
-                    'full_name': user.full_name,
-                    'is_active': user.is_active,
-                    'email_verified': user.email_verified,
-                    'phone_verified': user.phone_verified
-                }
-                
-                return Response({
-                    'success': True,
-                    'message': message,
-                    'user': user_data,
-                    'tokens': {
-                        'access': str(access),
-                        'refresh': str(refresh),
-                    }
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    'success': False,
-                    'message': message
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
+            if not success:
+                return Response({'success': False, 'message': message}, status=status.HTTP_400_BAD_REQUEST)
+
+            # For login OTPs, we don't change email_verified/phone_verified flags inside model verify for 'login'; ensure user is active
+            if otp_type == 'login' and not user.is_active:
+                user.is_active = True
+                user.save(update_fields=['is_active'])
+
+            # Issue tokens (7 day access / 30 day refresh per settings)
+            refresh = RefreshToken.for_user(user)
+            access = refresh.access_token
+
+            # Minimal user payload
+            user_data = {
+                'uuid': str(user.uuid),
+                'full_name': user.full_name,
+            }
+            if user.email:
+                user_data['email'] = user.email
+            if user.phone_number and not user.email:
+                # Only include phone if email absent to keep payload small
+                user_data['phone_number'] = user.phone_number
+            elapsed_ms = int((timezone.now() - start_time).total_seconds() * 1000)
+            return Response({
+                'success': True,
+                'message': message,
+                'user': user_data,
+                'tokens': {
+                    'access': str(access),
+                    'refresh': str(refresh),
+                },
+            }, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(f"OTP verification error: {e}")
-            return Response({
-                'success': False,
-                'message': 'OTP verification failed',
-                'error': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'success': False, 'message': 'OTP verification failed', 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class OTPRequestView(APIView):
