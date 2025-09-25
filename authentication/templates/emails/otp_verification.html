@@ -1,345 +1,148 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verify Your DriveShare Account</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+    <title>DriveShare Verification Code</title>
+    <!--[if mso]>
+    <xml>
+        <o:OfficeDocumentSettings>
+            <o:AllowPNG/>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+        </o:OfficeDocumentSettings>
+    </xml>
+    <![endif]-->
+        <style>
+            :root { color-scheme: light dark; }
+        @media (prefers-color-scheme: dark) {
+            .bg-body { background-color: #0f172a !important; }
+            .bg-card { background-color: #111827 !important; }
+            .text-default { color: #e5e7eb !important; }
+            .text-muted { color: #9ca3af !important; }
+            .divider { border-color: #374151 !important; }
         }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-        }
-        
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%);
-            padding: 40px 30px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="2" fill="white" opacity="0.1"/></svg>') repeat;
-            animation: float 10s ease-in-out infinite;
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        .logo {
-            position: relative;
-            z-index: 2;
-        }
-        
-        .logo h1 {
-            color: white;
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        
-        .car-icon {
-            width: 60px;
-            height: 40px;
-            margin: 0 auto 15px;
-            background: white;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .car-icon::before {
-            content: '🚗';
-            font-size: 24px;
-        }
-        
-        .tagline {
-            color: rgba(255,255,255,0.9);
-            font-size: 16px;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .content {
-            padding: 50px 30px;
-            text-align: center;
-        }
-        
-        .welcome-text {
-            font-size: 24px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-        
-        .message {
-            font-size: 16px;
-            color: #7f8c8d;
-            margin-bottom: 40px;
-            line-height: 1.8;
-        }
-        
-        .otp-container {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            border-radius: 15px;
-            padding: 30px;
-            margin: 30px 0;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .otp-container::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffecd2);
-            border-radius: 15px;
-            z-index: -1;
-            animation: gradient-rotate 3s linear infinite;
-        }
-        
-        @keyframes gradient-rotate {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .otp-label {
-            color: white;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-        
-        .otp-code {
-            background: rgba(255,255,255,0.95);
-            color: #2c3e50;
-            font-size: 36px;
-            font-weight: 700;
-            letter-spacing: 8px;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 15px 0;
-            font-family: 'Courier New', monospace;
-            text-shadow: none;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        }
-        
-        .otp-note {
-            color: rgba(255,255,255,0.9);
-            font-size: 14px;
-            margin-top: 15px;
-        }
-        
-        .security-info {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 25px;
-            margin: 30px 0;
-            border-left: 4px solid #4ecdc4;
-        }
-        
-        .security-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .security-title::before {
-            content: '🔐';
-            margin-right: 8px;
-        }
-        
-        .security-text {
-            font-size: 14px;
-            color: #7f8c8d;
-            line-height: 1.6;
-        }
-        
-        .cta-section {
-            text-align: center;
-            margin: 40px 0;
-        }
-        
-        .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            padding: 15px 35px;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-        }
-        
-        .cta-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
-        }
-        
-        .footer {
-            background: #2c3e50;
-            padding: 30px;
-            text-align: center;
-            color: #bdc3c7;
-        }
-        
-        .footer-title {
-            color: white;
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        .footer-text {
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 20px;
-        }
-        
-        .social-links {
-            margin: 20px 0;
-        }
-        
-        .social-links a {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            background: #34495e;
-            color: #bdc3c7;
-            text-decoration: none;
-            border-radius: 50%;
-            line-height: 40px;
-            margin: 0 5px;
-            transition: all 0.3s ease;
-        }
-        
-        .social-links a:hover {
-            background: #4ecdc4;
-            color: white;
-            transform: translateY(-2px);
-        }
-        
-        .copyright {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-top: 20px;
-        }
-        
-        @media (max-width: 600px) {
-            .email-container {
-                margin: 10px;
-                border-radius: 15px;
-            }
-            
-            .header, .content, .footer {
-                padding: 30px 20px;
-            }
-            
-            .otp-code {
-                font-size: 28px;
-                letter-spacing: 4px;
-            }
-            
-            .welcome-text {
-                font-size: 20px;
-            }
-        }
+        /* iOS blue links */
+        a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; }
     </style>
 </head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <div class="car-icon"></div>
-            <div class="logo">
-                <h1>DriveShare</h1>
-                <div class="tagline">Your Ride, Your Way</div>
-            </div>
-        </div>
-        
-        <div class="content">
-            <h2 class="welcome-text">Welcome to DriveShare! 🎉</h2>
-            <p class="message">
-                You're just one step away from joining thousands of riders and drivers in our amazing community. 
-                Please verify your email address to complete your registration.
-            </p>
-            
-            <div class="otp-container">
-                <div class="otp-label">Your Verification Code</div>
-                <div class="otp-code">{{ otp_code }}</div>
-                <div class="otp-note">Valid for {{ expiry_minutes }} minutes</div>
-            </div>
-            
-            <div class="security-info">
-                <div class="security-title">Security Notice</div>
-                <div class="security-text">
-                    This code is unique to your account and expires in {{ expiry_minutes }} minutes. 
-                    Never share this code with anyone. Our team will never ask for your verification code.
-                </div>
-            </div>
-            
-            <div class="cta-section">
-                <a href="#" class="cta-button">Complete Registration</a>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <div class="footer-title">DriveShare Team</div>
-            <div class="footer-text">
-                Safe rides, reliable drivers, and seamless experiences - that's our promise to you.
-            </div>
-            
-            <div class="social-links">
-                <a href="#" title="Facebook">f</a>
-                <a href="#" title="Twitter">t</a>
-                <a href="#" title="Instagram">i</a>
-                <a href="#" title="LinkedIn">in</a>
-            </div>
-            
-            <div class="copyright">
-                © 2025 DriveShare. All rights reserved.<br>
-                This email was sent because you requested verification for your DriveShare account.
-            </div>
-        </div>
+<body class="bg-body" style="margin:0; padding:0; background-color:#f4f5f7;">
+    <!-- Preheader text -->
+        <div style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">
+        Your DriveShare verification code is {{ otp_code }}. This code expires in {{ expiry_minutes }} minutes.
     </div>
+
+    <center role="article" aria-roledescription="email" lang="en" style="width:100%; background-color:#f4f5f7;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f4f5f7;">
+            <tr>
+                <td align="center" style="padding:24px 12px;">
+                    <!-- Container -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; width:100%;">
+                        <!-- Brand header -->
+                        <tr>
+                            <td align="left" class="bg-card" style="background:#111827;border-radius:8px 8px 0 0; padding:24px 24px;">
+                                <table width="100%" role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                    <tr>
+                                        <td align="left">
+                                            <div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:18px; font-weight:700; color:#ffffff; letter-spacing:0.2px;">
+                                                DriveShare
+                                            </div>
+                                            <div class="text-muted" style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#9ca3af; margin-top:2px;">
+                                                Your ride, your way
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+
+                        <!-- Card -->
+                        <tr>
+                            <td class="bg-card" style="background:#ffffff; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 8px 8px;">
+                                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                    <tr>
+                                        <td align="left" style="padding:28px 24px 8px 24px;">
+                                            <div class="text-default" style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:20px; font-weight:600; color:#111827;">Verify your email</div>
+                                            <div class="text-muted" style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; color:#6b7280; margin-top:8px;">
+                                                Use the verification code below to finish setting up your DriveShare account.
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- OTP code block -->
+                                    <tr>
+                                        <td align="center" style="padding:8px 24px 0 24px;">
+                                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:separate;">
+                                                <tr>
+                                                    <td align="center" style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:22px;">
+                                                        <div style="font-family:SFMono-Regular,Consolas,Menlo,monospace; font-size:32px; letter-spacing:6px; font-weight:700; color:#111827;">
+                                                            {{ otp_code }}
+                                                        </div>
+                                                        <div class="text-muted" style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#6b7280; margin-top:8px;">
+                                                            Code expires in {{ expiry_minutes }} minutes
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+
+                                    <!-- CTA Button (bulletproof) -->
+                                    <tr>
+                                        <td align="center" style="padding:24px 24px 8px 24px;">
+                                            <!--[if mso]>
+                                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" arcsize="50%" stroke="f" fillcolor="#4f46e5" style="height:44px;v-text-anchor:middle;width:240px;">
+                                                <w:anchorlock/>
+                                                <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:700;">Verify Account</center>
+                                            </v:roundrect>
+                                            <![endif]-->
+                                              <a href="#" target="_blank" style="background-color:#4f46e5; border-radius:999px; color:#ffffff; display:inline-block; font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; font-weight:700; line-height:44px; text-align:center; text-decoration:none; width:240px; -webkit-text-size-adjust:none;">Verify Account</a>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Security notice -->
+                                    <tr>
+                                        <td align="left" style="padding:24px;">
+                                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+                                                <tr>
+                                                    <td style="padding:16px 16px;">
+                                                        <div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; color:#111827;">Security tip</div>
+                                                        <div class="text-muted" style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:13px; color:#6b7280; margin-top:6px;">
+                                                            This code is unique to your account. Do not share it with anyone. If you didn’t request this, you can safely ignore this email.
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Divider -->
+                                    <tr>
+                                        <td style="padding:8px 24px;">
+                                            <hr class="divider" style="border:none;border-top:1px solid #e5e7eb; margin:0;">
+                                        </td>
+                                    </tr>
+
+                                    <!-- Footer -->
+                                    <tr>
+                                        <td align="center" style="padding:16px 24px 28px 24px;">
+                                            <div class="text-muted" style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#6b7280;">
+                                                © 2025 DriveShare. All rights reserved.
+                                            </div>
+                                            <div class="text-muted" style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:#6b7280; margin-top:4px;">
+                                                You’re receiving this email because you attempted to sign up or sign in to DriveShare.
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </center>
 </body>
 </html>

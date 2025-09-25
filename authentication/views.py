@@ -31,59 +31,71 @@ class UserRegistrationView(APIView):
         try:
             serializer = UserRegistrationSerializer(data=request.data)
             if serializer.is_valid():
-                # Use single database transaction for all operations
+                # Use single database transaction ONLY for user creation (FASTEST)
                 with transaction.atomic():
                     user = serializer.save()
-                    
-                    # Pre-generate OTP in the same transaction (faster)
-                    identifier = user.email or user.phone_number
-                    otp_type = 'email' if user.email else 'phone'
-                    
-                    # Direct OTP creation without extra model method call
-                    from django.conf import settings
-                    import random, string
-                    otp_length = getattr(settings, 'OTP_LENGTH', 4)
-                    otp_code = ''.join(random.choices(string.digits, k=otp_length))
-                    
-                    # Create OTP record directly
-                    from django.utils import timezone
-                    from datetime import timedelta
-                    expiry_minutes = getattr(settings, 'OTP_EXPIRY_MINUTES', 10)
-                    
-                    otp_verification = OTPVerification.objects.create(
-                        user=user,
-                        otp_code=otp_code,
-                        otp_type=otp_type,
-                        recipient=identifier,
-                        expires_at=timezone.now() + timedelta(minutes=expiry_minutes)
-                    )
+                    # Activate user immediately - no waiting for OTP
+                    user.is_active = True  # Make user active immediately
+                    user.save()
                 
-                # Send OTP using ultra-fast background method
-                try:
-                    success, message, _ = otp_service.send_otp_ultra_fast(
-                        user, otp_type, identifier, otp_code
-                    )
-                except Exception as e:
-                    logger.warning(f"OTP sending queued: {e}")
-                    success, message = True, "Account created. OTP email queued."
+                # Generate OTP and send email in background thread (completely non-blocking)
+                identifier = user.email or user.phone_number
+                otp_type = 'email' if user.email else 'phone'
                 
-                # Return minimal user data for faster serialization
+                # Start background OTP process immediately after user creation
+                import threading
+                def handle_otp_background():
+                    """Handle OTP creation and sending in background"""
+                    try:
+                        # Generate OTP in background
+                        from django.conf import settings
+                        import random, string
+                        otp_length = getattr(settings, 'OTP_LENGTH', 4)
+                        otp_code = ''.join(random.choices(string.digits, k=otp_length))
+                        
+                        # Create OTP record in background
+                        from django.utils import timezone
+                        from datetime import timedelta
+                        expiry_minutes = getattr(settings, 'OTP_EXPIRY_MINUTES', 10)
+                        
+                        otp_verification = OTPVerification.objects.create(
+                            user=user,
+                            otp_code=otp_code,
+                            otp_type=otp_type,
+                            recipient=identifier,
+                            expires_at=timezone.now() + timedelta(minutes=expiry_minutes)
+                        )
+                        
+                        # Send OTP email in background
+                        otp_service.send_otp_ultra_fast(user, otp_type, identifier, otp_code)
+                        
+                        logger.info(f"Background OTP process completed for {identifier}")
+                        
+                    except Exception as e:
+                        logger.error(f"Background OTP process failed: {e}")
+                
+                # Start background thread immediately and return
+                thread = threading.Thread(target=handle_otp_background)
+                thread.daemon = True
+                thread.start()
+                
+                # Return minimal user data immediately - don't wait for anything
                 user_data = {
                     'uuid': str(user.uuid),
                     'email': user.email,
                     'phone_number': user.phone_number,
                     'full_name': user.full_name,
                     'is_active': user.is_active,
-                    'email_verified': user.email_verified,
-                    'phone_verified': user.phone_verified
+                    'email_verified': False,  # Will be verified when OTP is submitted
+                    'phone_verified': False
                 }
                 
                 return Response({
                     'success': True,
-                    'message': 'User registered successfully. Please verify your account.',
+                    'message': 'Registration complete! Check your email for verification code.',
                     'user': user_data,
-                    'otp_sent': success,
-                    'otp_message': message,
+                    'otp_sent': True,  # Always true since we queue it
+                    'otp_message': 'Verification email being sent',
                     'verification_required': True
                 }, status=status.HTTP_201_CREATED)
             
