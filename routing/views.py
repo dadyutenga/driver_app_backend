@@ -21,6 +21,15 @@ ORS_REVERSE_URL = "https://api.openrouteservice.org/geocode/reverse"
 REQUEST_TIMEOUT = 10
 DEFAULT_PROFILE = "driving-car"
 
+TANZANIA_BOUNDS = {
+	"min_lat": -11.761,
+	"max_lat": -0.985,
+	"min_lng": 29.327,
+	"max_lng": 40.449,
+}
+TANZANIA_COUNTRY_NAMES = {"Tanzania"}
+TANZANIA_COUNTRY_CODES = {"TZA", "TZ"}
+
 
 def _get_ors_headers(include_content_type: bool = True) -> Dict[str, str]:
 	api_key = getattr(settings, "OPENROUTESERVICE_API_KEY", "")
@@ -30,6 +39,13 @@ def _get_ors_headers(include_content_type: bool = True) -> Dict[str, str]:
 	if include_content_type:
 		headers["Content-Type"] = "application/json"
 	return headers
+
+
+def _is_in_tanzania(lat: float, lng: float) -> bool:
+	return (
+		TANZANIA_BOUNDS["min_lat"] <= lat <= TANZANIA_BOUNDS["max_lat"]
+		and TANZANIA_BOUNDS["min_lng"] <= lng <= TANZANIA_BOUNDS["max_lng"]
+	)
 
 
 @api_view(["GET"])
@@ -71,7 +87,7 @@ def autocomplete_places(request):
 	except ValueError as exc:
 		return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-	params = {"text": query, "size": size}
+	params = {"text": query, "size": size, "boundary.country": "tz"}
 	try:
 		ors_response = requests.get(
 			ORS_AUTOCOMPLETE_URL,
@@ -96,6 +112,16 @@ def autocomplete_places(request):
 		properties = feature.get("properties", {})
 		if len(coords) != 2:
 			continue
+		country_name = properties.get("country")
+		country_code = properties.get("country_a") or properties.get("country_iso_a2")
+		lat = coords[1]
+		lng = coords[0]
+		if not (
+			(country_name and country_name in TANZANIA_COUNTRY_NAMES)
+			or (country_code and country_code.upper() in TANZANIA_COUNTRY_CODES)
+			or _is_in_tanzania(lat, lng)
+		):
+			continue
 		results.append(
 			{
 				"label": properties.get("label"),
@@ -103,9 +129,15 @@ def autocomplete_places(request):
 				"region": properties.get("region"),
 				"country": properties.get("country"),
 				"confidence": properties.get("confidence"),
-				"lat": coords[1],
-				"lng": coords[0],
+				"lat": lat,
+				"lng": lng,
 			}
+		)
+
+	if not results:
+		return Response(
+			{"detail": "No Tanzanian results found for the provided query."},
+			status=status.HTTP_404_NOT_FOUND,
 		)
 
 	return Response({"results": results})
@@ -128,6 +160,12 @@ def reverse_geocode(request):
 	except ValueError:
 		return Response(
 			{"detail": "Parameters 'lat' and 'lng' must be valid numbers."},
+			status=status.HTTP_400_BAD_REQUEST,
+		)
+
+	if not _is_in_tanzania(lat_val, lng_val):
+		return Response(
+			{"detail": "Coordinates must be within Tanzania."},
 			status=status.HTTP_400_BAD_REQUEST,
 		)
 
@@ -154,17 +192,25 @@ def reverse_geocode(request):
 
 	data = ors_response.json()
 	features: List[Dict[str, Any]] = data.get("features", [])
-	if not features:
-		return Response({"detail": "No address found for the provided coordinates."}, status=status.HTTP_404_NOT_FOUND)
+	for feature in features:
+		properties = feature.get("properties", {})
+		country_name = properties.get("country")
+		country_code = properties.get("country_a") or properties.get("country_iso_a2")
+		if (
+			(country_name and country_name in TANZANIA_COUNTRY_NAMES)
+			or (country_code and country_code.upper() in TANZANIA_COUNTRY_CODES)
+		):
+			return Response({
+				"label": properties.get("label"),
+				"locality": properties.get("locality"),
+				"region": properties.get("region"),
+				"country": properties.get("country"),
+			})
 
-	top = features[0]
-	properties = top.get("properties", {})
-	return Response({
-		"label": properties.get("label"),
-		"locality": properties.get("locality"),
-		"region": properties.get("region"),
-		"country": properties.get("country"),
-	})
+	return Response(
+		{"detail": "No Tanzanian address found for the provided coordinates."},
+		status=status.HTTP_404_NOT_FOUND,
+	)
 
 
 @api_view(["POST"])
@@ -179,6 +225,12 @@ def create_ride(request):
 	except (KeyError, TypeError, ValueError):
 		return Response(
 			{"detail": "Missing or invalid coordinates. Provide start_lat, start_lng, end_lat, and end_lng."},
+			status=status.HTTP_400_BAD_REQUEST,
+		)
+
+	if not _is_in_tanzania(start_lat, start_lng) or not _is_in_tanzania(end_lat, end_lng):
+		return Response(
+			{"detail": "Start and end coordinates must both be within Tanzania."},
 			status=status.HTTP_400_BAD_REQUEST,
 		)
 

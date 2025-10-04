@@ -6,6 +6,7 @@ The routing module exposes location-aware endpoints backed by OpenRouteService. 
 - API base path: `http://localhost:8000/api/v1/routing/`
 - Authentication: **not required** for initial testing (all endpoints use `AllowAny`).
 - Response format: JSON
+- Geographic scope: **Tanzania only**. Requests using coordinates or results outside the national bounds are rejected.
 
 ## Prerequisites
 1. Ensure the Django server is running: `python manage.py runserver`
@@ -74,7 +75,7 @@ Retrieves rides ordered from newest to oldest.
 ### 3. Create Ride
 **POST** `/rides/create/`
 
-Requests directions from OpenRouteService and stores the resulting ride.
+Requests directions from OpenRouteService and stores the resulting ride. Both the origin and destination must be within Tanzania.
 
 **Request Body**
 ```json
@@ -147,7 +148,7 @@ Wraps OpenRouteService autocomplete to provide forward geocoding suggestions.
 ### 5. Reverse Geocode
 **GET** `/places/reverse/?lat=<latitude>&lng=<longitude>`
 
-Returns the best matching address for the supplied coordinates.
+Returns the best matching address for the supplied coordinates. The supplied coordinates must lie within Tanzania.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -157,10 +158,10 @@ Returns the best matching address for the supplied coordinates.
 **Response 200**
 ```json
 {
-    "label": "State House, Ibadan, Nigeria",
-    "locality": "Ibadan",
-    "region": "Oyo",
-    "country": "Nigeria"
+    "label": "Zanzibar Port, Zanzibar, Tanzania",
+    "locality": "Zanzibar",
+    "region": "Mjini Magharibi",
+    "country": "Tanzania"
 }
 ```
 
@@ -175,7 +176,8 @@ All routing endpoints return errors in a consistent structure:
 ```
 
 Common cases:
-- `400 Bad Request` – Missing or invalid query/body parameters.
+- `400 Bad Request` – Missing or invalid parameters, or coordinates outside Tanzania.
+- `404 Not Found` – No Tanzanian matches for the provided query or coordinates.
 - `502 Bad Gateway` – Issues communicating with OpenRouteService (network errors, invalid profile, rate limiting).
 - `500 Internal Server Error` – Server misconfiguration such as a missing API key.
 
