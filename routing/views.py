@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 import requests
 from django.conf import settings
@@ -48,6 +48,10 @@ def _is_in_tanzania(lat: float, lng: float) -> bool:
 	)
 
 
+def _normalize_admin_name(value: str) -> str:
+	return value.strip().casefold()
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def routing_index(request):
@@ -81,6 +85,16 @@ def autocomplete_places(request):
 			{"detail": "Query parameter 'size' must be an integer."},
 			status=status.HTTP_400_BAD_REQUEST,
 		)
+
+	region_filters: Set[str] = set()
+	for key in ("region", "regions"):
+		for raw_value in request.query_params.getlist(key):
+			if not raw_value:
+				continue
+			for part in raw_value.split(","):
+				trimmed = part.strip()
+				if trimmed:
+					region_filters.add(_normalize_admin_name(trimmed))
 
 	try:
 		headers = _get_ors_headers(include_content_type=False)
@@ -122,6 +136,21 @@ def autocomplete_places(request):
 			or _is_in_tanzania(lat, lng)
 		):
 			continue
+		if region_filters:
+			admin_candidates = {
+				properties.get("region"),
+				properties.get("locality"),
+				properties.get("county"),
+				properties.get("state"),
+				properties.get("macroregion"),
+			}
+			normalized_admins = {
+				_normalize_admin_name(name)
+				for name in admin_candidates
+				if isinstance(name, str) and name.strip()
+			}
+			if not normalized_admins.intersection(region_filters):
+				continue
 		results.append(
 			{
 				"label": properties.get("label"),
@@ -135,10 +164,10 @@ def autocomplete_places(request):
 		)
 
 	if not results:
-		return Response(
-			{"detail": "No Tanzanian results found for the provided query."},
-			status=status.HTTP_404_NOT_FOUND,
-		)
+		detail = "No Tanzanian results found for the provided query."
+		if region_filters:
+			detail = "No Tanzanian results found for the provided query and region filters."
+		return Response({"detail": detail}, status=status.HTTP_404_NOT_FOUND)
 
 	return Response({"results": results})
 

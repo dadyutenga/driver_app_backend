@@ -119,14 +119,17 @@ Requests directions from OpenRouteService and stores the resulting ride. Both th
 ```
 
 ### 4. Place Autocomplete
-**GET** `/places/autocomplete/?q=<query>&size=<1-10>`
+**GET** `/places/autocomplete/?q=<query>&size=<1-10>&region=<name>`
 
 Wraps OpenRouteService autocomplete to provide forward geocoding suggestions.
+
+When a region filter is supplied, the service dynamically narrows results to matches whose administrative metadata (region, county, state, locality) aligns with any provided value.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `q`       | string | Yes | Search text (e.g. `dar es salaam`). |
 | `size`    | int | No | Limits results (default 5, max 10). |
+| `region` / `regions` | string | No | Filter matches to one or more Tanzanian administrative names. Accepts comma-separated values (e.g. `region=arusha` or `regions=arusha,Manyara`). |
 
 **Response 200**
 ```json
@@ -189,7 +192,7 @@ Use the following curl snippets (PowerShell compatible) to exercise the API once
 curl "http://localhost:8000/api/v1/routing/"
 
 # Autocomplete
-curl "http://localhost:8000/api/v1/routing/places/autocomplete/?q=dar%20es%20salaam"
+curl "http://localhost:8000/api/v1/routing/places/autocomplete/?q=mbande&region=dodoma"
 
 # Reverse geocode
 curl "http://localhost:8000/api/v1/routing/places/reverse/?lat=-6.7924&lng=39.2083"
