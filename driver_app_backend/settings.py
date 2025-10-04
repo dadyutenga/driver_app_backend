@@ -229,6 +229,9 @@ AFRICASTALKING_USERNAME = config('AFRICASTALKING_USERNAME', default='your-africa
 AFRICASTALKING_API_KEY = config('AFRICASTALKING_API_KEY', default='your-africastalking-api-key')
 AFRICASTALKING_SENDER_ID = config('AFRICASTALKING_SENDER_ID', default='your-sender-id')
 
+# Routing / Maps Configuration
+OPENROUTESERVICE_API_KEY = config('OPENROUTESERVICE_API_KEY', default='')
+
 # OTP Configuration (Using Environment Variables)
 OTP_EXPIRY_MINUTES = config('OTP_EXPIRY_MINUTES', default=10, cast=int)
 OTP_LENGTH = config('OTP_LENGTH', default=4, cast=int)

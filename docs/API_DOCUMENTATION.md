@@ -8,6 +8,8 @@ This is a comprehensive Django REST API for a driver sharing application with ad
 - OAuth integration (Google, Facebook)
 - SMS (Twilio, AfricasTalking) and Email support
 
+Routing-specific endpoints are documented separately in `ROUTING_API.md`.
+
 ## Base URL
 ```
 http://localhost:8000/api/v1/
@@ -346,6 +348,9 @@ TWILIO_PHONE_NUMBER=your-twilio-phone-number
 AFRICASTALKING_USERNAME=your-africastalking-username
 AFRICASTALKING_API_KEY=your-africastalking-api-key
 AFRICASTALKING_SENDER_ID=your-sender-id
+
+# Routing (OpenRouteService)
+OPENROUTESERVICE_API_KEY=your-openrouteservice-api-key
 ```
 
 ## Installation
