@@ -1,8 +1,10 @@
 from django.db import models
 
+from data.models import Driver
+
 
 class Ride(models.Model):
-    driver_id = models.IntegerField(null=True, blank=True)
+    driver = models.ForeignKey(Driver, on_delete=models.SET_NULL, null=True, blank=True)
     start_lat = models.FloatField()
     start_lng = models.FloatField()
     start_address = models.CharField(max_length=255, blank=True)

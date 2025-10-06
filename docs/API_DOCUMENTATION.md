@@ -10,6 +10,8 @@ This is a comprehensive Django REST API for a driver sharing application with ad
 
 Routing-specific endpoints are documented separately in `ROUTING_API.md`.
 
+Driver verification endpoints are documented separately in `DRIVER_VERIFICATION_API.md`.
+
 ## Base URL
 ```
 http://localhost:8000/api/v1/

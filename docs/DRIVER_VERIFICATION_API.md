@@ -1,11 +1,23 @@
 # Driver Verification API Documentation
 
 ## Overview
-This document outlines the API endpoint for submitting driver verification data, including personal information, vehicle details, and required photo uploads.
+This document outlines the API endpoints for submitting and retrieving driver verification data, including personal information, vehicle details, and required photo uploads.
 
-## Endpoint
+## Endpoints
+
+### Submit Driver Verification
 ```
-POST /api/driver/verification
+POST /api/v1/data/driver/verification
+```
+
+### Get Driver Profile
+```
+GET /api/v1/data/driver/profile
+```
+
+### Get Car Details
+```
+GET /api/v1/data/driver/car
 ```
 
 ## Request Format
@@ -129,5 +141,70 @@ curl -X POST \
 - Consider implementing image processing to validate and optimize uploaded photos
 - Store files securely with appropriate access controls
 - Implement proper logging for audit trails
-- Consider adding image compression on the server side to save storage space</content>
+- Consider adding image compression on the server side to save storage space
+
+## Get Driver Profile
+
+### Endpoint
+```
+GET /api/v1/data/driver/profile
+```
+
+### Authentication
+Requires JWT authentication.
+
+### Response Format
+
+#### Success Response (200 OK)
+```json
+{
+  "success": true,
+  "data": {
+    "fullName": "John Doe",
+    "profilePhoto": "https://api.example.com/media/profile_photos/john_doe.jpg"
+  }
+}
+```
+
+#### Error Response (404 Not Found)
+```json
+{
+  "success": false,
+  "message": "Driver profile not found."
+}
+```
+
+## Get Car Details
+
+### Endpoint
+```
+GET /api/v1/data/driver/car
+```
+
+### Authentication
+Requires JWT authentication.
+
+### Response Format
+
+#### Success Response (200 OK)
+```json
+{
+  "success": true,
+  "data": {
+    "carName": "Toyota Corolla 2020",
+    "plateNumber": "T123ABC",
+    "carType": "Sedan",
+    "numberOfSeats": 4,
+    "carPhoto": "https://api.example.com/media/car_photos/toyota_corolla.jpg"
+  }
+}
+```
+
+#### Error Response (404 Not Found)
+```json
+{
+  "success": false,
+  "message": "Driver profile not found."
+}
+```</content>
 <parameter name="filePath">d:\projects\ride_driver\DRIVER_VERIFICATION_API.md

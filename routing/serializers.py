@@ -8,7 +8,7 @@ class RideSerializer(serializers.ModelSerializer):
         model = Ride
         fields = [
             "id",
-            "driver_id",
+            "driver",
             "start_lat",
             "start_lng",
             "start_address",

@@ -265,10 +265,14 @@ def create_ride(request):
 
 	driver_raw = data.get("driver_id")
 	try:
-		driver_id = int(driver_raw) if driver_raw not in (None, "") else None
-	except (TypeError, ValueError):
+		if driver_raw not in (None, ""):
+			from data.models import Driver
+			driver = Driver.objects.get(id=int(driver_raw))
+		else:
+			driver = None
+	except (TypeError, ValueError, Driver.DoesNotExist):
 		return Response(
-			{"detail": "driver_id must be an integer if provided."},
+			{"detail": "driver_id must be a valid Driver ID if provided."},
 			status=status.HTTP_400_BAD_REQUEST,
 		)
 
@@ -318,7 +322,7 @@ def create_ride(request):
 	duration_min = round(duration_s / 60.0, 2)
 
 	ride = Ride.objects.create(
-		driver_id=driver_id,
+		driver=driver,
 		start_lat=start_lat,
 		start_lng=start_lng,
 		start_address=data.get("start_address", ""),
