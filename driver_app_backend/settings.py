@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'oauth2_provider',
     'authentication',
     'routing',
+    'data',
 ]
 
 MIDDLEWARE = [
