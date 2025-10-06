@@ -38,6 +38,10 @@ def driver_verification(request):
         for field, messages in serializer.errors.items():
             for message in messages:
                 errors.append({"field": field, "message": message})
+        return Response(
+            {"success": False, "message": "Validation failed", "errors": errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_driver_profile(request):
